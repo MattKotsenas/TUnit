@@ -1,4 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace TUnit.Templates.Tests;
 
@@ -21,10 +23,21 @@ public abstract class TemplateTestBase : IDisposable
 
     protected VerificationEngine Engine => new(_loggerFactory);
 
-    protected TemplateVerifierOptions Options => new(TemplateShortName)
+    protected TemplateVerifierOptions Options => new TemplateVerifierOptions(TemplateShortName)
     {
         TemplatePath = Path.Combine(TestContext.CurrentContext.TestDirectory, "content", TemplateShortName),
-    };
+    }.WithCustomScrubbers(ScrubbersDefinition.Empty.AddScrubber(sb =>
+    {
+        string original = sb.ToString();
+        Match match = Regex.Match(original, """<PackageReference Include="TUnit[^"]*" Version="([^"]*)" />""");
+
+        if (match.Success)
+        {
+            string line = match.Groups[0].Value.Replace(match.Groups[1].Value, "{VERSION}");
+            sb.Replace(match.Value, line);
+        }
+
+    }, "csproj"));
 
     protected virtual void Dispose(bool disposing)
     {
